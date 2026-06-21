@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <title>AR.js & Three.js Explorer</title>
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- CDNs for Three.js & AR.js extension -->
+  <!-- Note: Loading three.js r128 first, then AR.js's three.js build -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/three.js/build/ar-threex.js"></script>
+</head>
+<body>
+
+  <!-- 1. Splash Screen / Onboarding -->
+  <div id="splash-screen">
+    <div class="splash-content">
+      <h1 class="splash-logo">WEB.AR EXPLORER</h1>
+      <p class="splash-subtitle">Augmented Reality in the Browser</p>
+      
+      <div class="splash-instructions">
+        <h3>How to test:</h3>
+        <ul>
+          <li>Allow camera permissions when prompted.</li>
+          <li>Click the "Show Hiro Marker" button in the panel.</li>
+          <li>Scan/point your webcam towards the Hiro marker (printed or on a second screen).</li>
+          <li>Interact with the 3D model in real time using the HUD dashboard!</li>
+        </ul>
+      </div>
+      
+      <button class="btn-primary" id="btn-start-ar">ENTER AR SPACE</button>
+    </div>
+  </div>
+
+  <!-- 2. Loading Spinner -->
+  <div id="loading-screen">
+    <div class="spinner"></div>
+    <div class="loading-text">INITIALIZING CAMERA STREAM...</div>
+  </div>
+
+  <!-- 3. Heads-Up Display (HUD) Panel -->
+  <div id="hud-container">
+    <!-- Header Area -->
+    <header class="glass-panel hud-interactive">
+      <div class="brand-section">
+        <h2 class="brand-logo">AR.HUD</h2>
+      </div>
+      <div class="status-panel">
+        <div class="status-badge" id="status-camera">
+          <div class="status-dot" id="dot-camera"></div>
+          CAMERA: <span id="text-camera">OFFLINE</span>
+        </div>
+      </div>
+      <div class="status-panel">
+        <div class="status-badge" id="status-tracking">
+          <div class="status-dot" id="dot-tracking"></div>
+          TRACKING: <span id="text-tracking">SEARCHING</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sidebar Panel (Controls) -->
+    <aside class="glass-panel hud-interactive">
+      <!-- Shape Selector Section -->
+      <section class="control-group">
+        <h3 class="panel-section-title">Geometry</h3>
+        <label for="shape-select">3D Mesh</label>
+        <div class="custom-select">
+          <select id="shape-select">
+            <option value="cube">Rotating Cube</option>
+            <option value="torus">Torus Knot</option>
+            <option value="sphere">Glossy Sphere</option>
+            <option value="cylinder">Cyber Cylinder</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Material Color Selection -->
+      <section class="control-group">
+        <h3 class="panel-section-title">Aesthetics</h3>
+        <label>Material Color</label>
+        <div class="color-palette" id="color-palette">
+          <!-- HSL color dots dynamically styled in stylesheet or script -->
+          <div class="color-dot selected" data-color="#00f0ff" style="background-color: #00f0ff;"></div>
+          <div class="color-dot" data-color="#bd00ff" style="background-color: #bd00ff;"></div>
+          <div class="color-dot" data-color="#ff007f" style="background-color: #ff007f;"></div>
+          <div class="color-dot" data-color="#39ff14" style="background-color: #39ff14;"></div>
+          <div class="color-dot" data-color="#ffea00" style="background-color: #ffea00;"></div>
+        </div>
+      </section>
+
+      <!-- Scale Slider -->
+      <section class="control-group">
+        <h3 class="panel-section-title">Transform</h3>
+        <label for="scale-slider">Scale <span id="lbl-scale">1.0x</span></label>
+        <input type="range" id="scale-slider" min="0.3" max="2.0" step="0.1" value="1.0">
+      </section>
+
+      <!-- Rotation Slider -->
+      <section class="control-group">
+        <label for="speed-slider">Rotation Speed <span id="lbl-speed">1.0x</span></label>
+        <input type="range" id="speed-slider" min="0.0" max="3.0" step="0.1" value="1.0">
+      </section>
+
+      <!-- Marker Reference Trigger -->
+      <section class="control-group" style="margin-top: auto;">
+        <button id="btn-show-marker" class="btn-secondary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          Show Hiro Marker
+        </button>
+      </section>
+    </aside>
+
+    <!-- Footer Toast -->
+    <footer class="hud-interactive">
+      <div class="instruction-toast">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        <span>Point camera at the <span class="highlight">Hiro Marker</span> to project the 3D model.</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- 4. Marker Reference Modal -->
+  <div id="marker-modal" class="modal-overlay">
+    <div class="modal-card glass-panel hud-interactive" style="max-width: 600px;">
+      <button class="modal-close" id="btn-close-modal">&times;</button>
+      <h3 class="modal-title">Hiro Marker & Mobile Helper</h3>
+      <p class="modal-desc">Point your laptop's selfie camera at the marker. Since you are using a selfie camera, scan the QR code with your phone to open the marker on your phone screen, then hold your phone up to the webcam!</p>
+      
+      <div style="display: flex; gap: 20px; justify-content: center; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
+        <div style="text-align: center;">
+          <div style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--accent-cyan); margin-bottom: 8px;">1. TARGET MARKER</div>
+          <div class="marker-container" style="margin-bottom: 0;">
+            <img src="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/HIRO.jpg" alt="Hiro Marker Pattern" class="marker-image" style="width: 180px; height: 180px;">
+          </div>
+        </div>
+        
+        <div style="text-align: center;">
+          <div style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--accent-purple); margin-bottom: 8px;">2. SCAN FOR PHONE</div>
+          <div class="marker-container" style="margin-bottom: 0; background: #fff; padding: 10px;">
+            <!-- QR code to open the raw Hiro marker image on phone -->
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/HIRO.jpg" alt="Scan QR to Open Marker on Phone" class="marker-image" style="width: 180px; height: 180px;">
+          </div>
+        </div>
+      </div>
+      
+      <p style="font-size: 0.75rem; color: var(--text-secondary);">Tip: Increase your phone screen brightness to 100% for faster camera tracking response.</p>
+    </div>
+  </div>
+
+  <!-- Main Animation / WebGL Script -->
+  <script src="animation.js"></script>
+</body>
+</html>
