@@ -26,6 +26,49 @@ Then open your browser and navigate to: **`http://localhost:8080`**
 
 ---
 
+## 📱 Running & Accessing on Other Devices (e.g. Mobile, Friends' Devices)
+
+Because modern web browsers enforce **Secure Contexts (HTTPS)** for webcam access, simply opening `http://<your-local-ip>:8080` on another device (like your phone or a friend's device) will **block camera permissions**. 
+
+To share and run this project on other devices, use one of the following methods to serve it over a secure HTTPS connection:
+
+### Method 1: Using VS Code Port Forwarding (Easiest if using VS Code)
+If you are using Visual Studio Code, you can expose your local server with built-in port forwarding:
+1. Run your local server (using Node.js or Python as shown above on port `8080`).
+2. Go to the **Ports** tab in VS Code (next to your Terminal).
+3. Click **Forward a Port** and enter `8080`.
+4. Right-click the forwarded port in the list, select **Port Visibility**, and set it to **Public**.
+5. Copy the **Forwarded Address** (which will start with `https://...`).
+6. Share this link with your friend or scan/open it on your phone!
+
+### Method 2: Instant Public Tunneling (No installation needed)
+You can create a temporary public HTTPS tunnel to your local server directly from your terminal.
+
+*   **Option A: Using Pinggy (via SSH - no installation required)**
+    While your local server is running on port `8080`, open a new terminal window and run:
+    ```bash
+    ssh -R 80:localhost:8080 a.pinggy.io
+    ```
+    This command will print a secure `https://...` link in your terminal. Copy and share it!
+
+*   **Option B: Using Localtunnel (requires Node.js)**
+    Open a new terminal window and run:
+    ```bash
+    npx localtunnel --port 8080
+    ```
+    Open the generated `https://...` link on your phone or share it with your friend.
+
+### Method 3: Instant Deployment to Vercel (Free & Permanent)
+Since this is a static website (HTML, CSS, JS), you can deploy it online for free in less than a minute. In your project directory, run:
+```bash
+npx vercel
+```
+1. Log in if prompted.
+2. Confirm the project creation prompts (you can press Enter to accept all default settings).
+3. Once completed, Vercel will give you a permanent, secure production URL (e.g. `https://your-project.vercel.app`) that anyone can open on any device!
+
+---
+
 ## 🎯 How to Use the AR Space
 
 1. **Enter AR Space**: Click the **ENTER AR SPACE** button on the splash screen and allow webcam/camera permissions when prompted.
