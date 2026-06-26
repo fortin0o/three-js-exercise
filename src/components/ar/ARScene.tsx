@@ -1,15 +1,18 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useARStore } from '@/store/arStore';
 import { useModelStore } from '@/store/modelStore';
 import { ENGINE_PARTS } from '@/data/engineParts';
 import { GlassCard } from '../ui/GlassCard';
-import { ZoomIn, ZoomOut, RotateCcw, Layers, Info, Wifi, WifiOff } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Layers, Info, Wifi, WifiOff, Cube } from 'lucide-react';
 import { ARToggleButton } from './ARToggleButton';
+import { CameraBackground } from './CameraBackground';
+import { startAR, stopAR, subscribeAR, getARState } from '@/services/mindar/controller';
+import type { ARDetectionState } from '@/services/mindar/controller';
 
-// Lazy load the heavy 3D canvas
 const EngineModel = dynamic(
   () => import('../model/EngineModel').then((m) => ({ default: m.EngineModel })),
   {
@@ -25,14 +28,46 @@ const EngineModel = dynamic(
   }
 );
 
-import { CameraBackground } from './CameraBackground';
-
 export function ARScene() {
-  const { mode, isTracking, cameraPermission } = useARStore();
-  const { selectedPartId, setSelectedPart, setScale, scale, isExploded, setExploded, resetModel } =
-    useModelStore();
-
+  const { mode, setCameraPermission, setError } = useARStore();
+  const { selectedPartId, setSelectedPart, setScale, scale, isExploded, setExploded, resetModel } = useModelStore();
   const isARMode = mode === 'camera';
+
+  const [arState, setARState] = useState<ARDetectionState>(getARState());
+  const mindarStarted = useRef(false);
+
+  // Subscribe to MindAR state changes
+  useEffect(() => {
+    const unsub = subscribeAR((s) => setARState({ ...s }));
+    return unsub;
+  }, []);
+
+  // Start/stop MindAR based on mode
+  useEffect(() => {
+    if (isARMode && !mindarStarted.current) {
+      mindarStarted.current = true;
+      setCameraPermission('granted');
+      startAR()
+        .then(({ projectionMatrix }) => {
+          // Successfully started
+        })
+        .catch((err) => {
+          setCameraPermission('denied');
+          setError(err.message);
+          mindarStarted.current = false;
+        });
+    }
+    if (!isARMode && mindarStarted.current) {
+      stopAR();
+      mindarStarted.current = false;
+    }
+    return () => {
+      if (mindarStarted.current) {
+        stopAR();
+        mindarStarted.current = false;
+      }
+    };
+  }, [isARMode, setCameraPermission, setError]);
 
   return (
     <div
@@ -40,7 +75,7 @@ export function ARScene() {
         isARMode ? 'bg-black' : 'bg-[#020408] scanline-overlay'
       }`}
     >
-      {/* ─── Demo Mode Background ──────────────────────────── */}
+      {/* Demo Mode Background */}
       {!isARMode && (
         <>
           <div className="absolute inset-0 bg-grid-pattern opacity-30" />
@@ -48,7 +83,7 @@ export function ARScene() {
         </>
       )}
 
-      {/* ─── AR Mode: Live Camera Feed ─────────────────────── */}
+      {/* AR Mode: Live Camera Feed */}
       <AnimatePresence>
         {isARMode && (
           <motion.div
@@ -64,19 +99,22 @@ export function ARScene() {
         )}
       </AnimatePresence>
 
-      {/* ─── 3D Canvas ─────────────────────────────────────── */}
-      {/* In AR mode: transparent canvas sits above the camera feed */}
-      {/* pointer-events: none on the container so touches reach OrbitControls on canvas */}
+      {/* 3D Canvas */}
       <div
         className="absolute inset-0 z-10"
         style={{ background: 'transparent', pointerEvents: 'none' }}
       >
         <div style={{ width: '100%', height: '100%', pointerEvents: 'auto' }}>
-          <EngineModel isARMode={isARMode} />
+          <EngineModel
+            isARMode={isARMode}
+            markerFound={arState.markerFound}
+            cameraMatrix={arState.cameraMatrix}
+            projectionMatrix={arState.projectionMatrix}
+          />
         </div>
       </div>
 
-      {/* ─── AR Mode: Corner Brackets (scan frame) ─────────── */}
+      {/* AR Mode: Corner Brackets */}
       {isARMode && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <motion.div
@@ -103,17 +141,22 @@ export function ARScene() {
                 animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
                 transition={{ duration: 1.5, repeat: Infinity }}
               />
-              <span className="text-[9px] text-cyan-400/60 tracking-widest uppercase mt-1">
-                AR Active
-              </span>
+              {arState.markerFound ? (
+                <span className="text-[9px] text-emerald-400 tracking-widest uppercase mt-1">
+                  Marker Detected
+                </span>
+              ) : (
+                <span className="text-[9px] text-cyan-400/60 tracking-widest uppercase mt-1">
+                  AR Active
+                </span>
+              )}
             </div>
           </motion.div>
         </div>
       )}
 
-      {/* ─── HUD Top Bar ───────────────────────────────────── */}
+      {/* HUD Top Bar */}
       <div className="absolute top-0 left-0 right-0 p-3 flex items-start justify-between z-30 pointer-events-none">
-        {/* Left: Mode toggle */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -123,14 +166,12 @@ export function ARScene() {
           <ARToggleButton />
         </motion.div>
 
-        {/* Right: Status indicators */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.6 }}
           className="flex gap-2 pointer-events-auto"
         >
-          {/* AR Live / Engine status badge */}
           <GlassCard className="px-3 py-2">
             <div className="flex items-center gap-2">
               <AnimatePresence mode="wait">
@@ -142,20 +183,22 @@ export function ARScene() {
                     exit={{ opacity: 0 }}
                     className="flex items-center gap-2"
                   >
-                    {cameraPermission === 'granted' ? (
+                    {arState.isLoaded ? (
                       <>
                         <motion.div
-                          className="w-1.5 h-1.5 rounded-full bg-cyan-400"
+                          className={`w-1.5 h-1.5 rounded-full ${arState.markerFound ? 'bg-emerald-400' : 'bg-cyan-400'}`}
                           animate={{ opacity: [1, 0.3, 1] }}
                           transition={{ duration: 1, repeat: Infinity }}
                         />
-                        <span className="text-[10px] text-cyan-400 font-medium">AR LIVE</span>
+                        <span className="text-[10px] text-cyan-400 font-medium">
+                          {arState.markerFound ? 'TRACKING' : 'AR LIVE'}
+                        </span>
                         <Wifi className="w-3 h-3 text-cyan-400" />
                       </>
                     ) : (
                       <>
-                        <WifiOff className="w-3 h-3 text-red-400" />
-                        <span className="text-[10px] text-red-400 font-medium">NO CAMERA</span>
+                        <div className="w-3 h-3 rounded-full border-2 border-cyan-500/50 border-t-cyan-400 animate-spin" />
+                        <span className="text-[10px] text-cyan-400 font-medium">LOADING AR</span>
                       </>
                     )}
                   </motion.div>
@@ -177,7 +220,7 @@ export function ARScene() {
         </motion.div>
       </div>
 
-      {/* ─── Part Selector (bottom-left) ─────────────────── */}
+      {/* Part Selector */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -216,7 +259,7 @@ export function ARScene() {
         ))}
       </motion.div>
 
-      {/* ─── Controls (bottom-right) ─────────────────────── */}
+      {/* Controls */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -244,7 +287,7 @@ export function ARScene() {
         />
       </motion.div>
 
-      {/* ─── Tip bar ─────────────────────────────────────── */}
+      {/* Tip bar */}
       <div className="absolute bottom-3 left-0 right-0 flex justify-center px-4 pointer-events-none z-30">
         <motion.div
           initial={{ opacity: 0 }}
@@ -255,7 +298,9 @@ export function ARScene() {
             <Info className="w-3.5 h-3.5 text-cyan-400 flex-none" />
             <p className="text-[11px] text-[#8892a4]">
               {isARMode
-                ? 'AR aktif • Arahkan kamera ke ruangan • Drag untuk rotasi'
+                ? arState.markerFound
+                  ? 'Marker locked • Model attached'
+                  : 'Arahkan kamera ke marker • Scan marker untuk melihat model'
                 : 'Tap komponen • Scroll untuk zoom • Drag untuk rotasi'}
             </p>
           </GlassCard>

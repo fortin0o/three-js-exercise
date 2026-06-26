@@ -1,15 +1,17 @@
 'use client';
 
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Environment, Grid, Stars, PerspectiveCamera, DeviceOrientationControls } from '@react-three/drei';
-import { Suspense, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, Environment, Grid, Stars, PerspectiveCamera } from '@react-three/drei';
+import { Suspense, useRef, useEffect, useMemo } from 'react';
 import { useModelStore } from '@/store/modelStore';
 import { EngineModelParts } from './ModelParts';
 import * as THREE from 'three';
 
 interface EngineModelProps {
   isARMode?: boolean;
+  markerFound?: boolean;
+  cameraMatrix?: Float32Array | null;
+  projectionMatrix?: Float32Array | null;
 }
 
 function EngineGroup() {
@@ -31,26 +33,34 @@ function EngineGroup() {
   );
 }
 
-function ARPositioner({ children }: { children: React.ReactNode }) {
+function MindARMarkerPositioner({
+  cameraMatrix,
+  projectionMatrix,
+  children,
+}: {
+  cameraMatrix: Float32Array;
+  projectionMatrix: Float32Array | null;
+  children: React.ReactNode;
+}) {
   const groupRef = useRef<THREE.Group>(null);
-  const initialized = useRef(false);
+  const { camera } = useThree();
 
-  useFrame(({ camera }) => {
-    if (!initialized.current && groupRef.current) {
-      // Wait until gyro sets a non-zero rotation (user moved device slightly)
-      if (Math.abs(camera.rotation.x) > 0.01 || Math.abs(camera.rotation.y) > 0.01) {
-        // Place engine exactly 5 units in front of the camera's new view
-        const dir = new THREE.Vector3(0, 0, -5);
-        dir.applyQuaternion(camera.quaternion);
-        groupRef.current.position.copy(camera.position).add(dir);
-        
-        // Face the camera perfectly
-        groupRef.current.lookAt(camera.position);
-        
-        initialized.current = true;
-      }
+  useEffect(() => {
+    if (groupRef.current && cameraMatrix) {
+      // MindAR provides a column-major 4x4 world matrix
+      const markerMatrix = new THREE.Matrix4().fromArray(cameraMatrix);
+      groupRef.current.matrixAutoUpdate = false;
+      groupRef.current.matrix.copy(markerMatrix);
     }
-  });
+  }, [cameraMatrix]);
+
+  useEffect(() => {
+    if (projectionMatrix && camera instanceof THREE.PerspectiveCamera) {
+      const pm = new THREE.Matrix4().fromArray(projectionMatrix);
+      camera.projectionMatrix.copy(pm);
+      camera.projectionMatrixInverse.copy(pm).invert();
+    }
+  }, [projectionMatrix, camera]);
 
   return <group ref={groupRef}>{children}</group>;
 }
@@ -58,7 +68,6 @@ function ARPositioner({ children }: { children: React.ReactNode }) {
 function SceneSetup({ isARMode }: { isARMode: boolean }) {
   return (
     <>
-      {/* Lighting — brighter in AR mode so model pops against real world */}
       <ambientLight intensity={isARMode ? 0.6 : 0.3} color="#e0e8ff" />
       <directionalLight
         position={[5, 8, 3]}
@@ -70,7 +79,6 @@ function SceneSetup({ isARMode }: { isARMode: boolean }) {
       <pointLight position={[4, -2, 4]} intensity={isARMode ? 0.8 : 0.5} color="#7c3aed" />
       <pointLight position={[0, 6, 0]} intensity={isARMode ? 0.6 : 0.4} color="#0080ff" />
 
-      {/* Background elements — hidden in AR mode (camera is the background) */}
       {!isARMode && (
         <>
           <Stars radius={80} depth={50} count={2000} factor={3} fade speed={0.5} />
@@ -89,7 +97,6 @@ function SceneSetup({ isARMode }: { isARMode: boolean }) {
         </>
       )}
 
-      {/* In AR mode, add a subtle ground shadow plane */}
       {isARMode && (
         <mesh position={[0, -1.5, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <planeGeometry args={[10, 10]} />
@@ -100,7 +107,12 @@ function SceneSetup({ isARMode }: { isARMode: boolean }) {
   );
 }
 
-export function EngineModel({ isARMode = false }: EngineModelProps) {
+export function EngineModel({
+  isARMode = false,
+  markerFound = false,
+  cameraMatrix = null,
+  projectionMatrix = null,
+}: EngineModelProps) {
   return (
     <div className="w-full h-full" style={{ background: 'transparent' }}>
       <Canvas
@@ -115,7 +127,7 @@ export function EngineModel({ isARMode = false }: EngineModelProps) {
         }}
         onCreated={({ gl }) => {
           if (isARMode) {
-            gl.setClearColor(0x000000, 0); // fully transparent clear
+            gl.setClearColor(0x000000, 0);
           }
         }}
         style={{
@@ -126,19 +138,22 @@ export function EngineModel({ isARMode = false }: EngineModelProps) {
 
         <Suspense fallback={null}>
           <SceneSetup isARMode={isARMode} />
-          {isARMode ? (
-            <ARPositioner>
+
+          {isARMode && markerFound && cameraMatrix ? (
+            <MindARMarkerPositioner cameraMatrix={cameraMatrix} projectionMatrix={projectionMatrix}>
               <EngineGroup />
-            </ARPositioner>
+            </MindARMarkerPositioner>
+          ) : isARMode ? (
+            /* In AR but no marker: show the engine at default position */
+            <EngineGroup />
           ) : (
             <EngineGroup />
           )}
+
           <Environment preset="city" />
         </Suspense>
 
-        {isARMode ? (
-          <DeviceOrientationControls />
-        ) : (
+        {!isARMode && (
           <OrbitControls
             enablePan={false}
             minDistance={2.5}
