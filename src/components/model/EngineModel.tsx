@@ -31,6 +31,30 @@ function EngineGroup() {
   );
 }
 
+function ARPositioner({ children }: { children: React.ReactNode }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const initialized = useRef(false);
+
+  useFrame(({ camera }) => {
+    if (!initialized.current && groupRef.current) {
+      // Wait until gyro sets a non-zero rotation (user moved device slightly)
+      if (Math.abs(camera.rotation.x) > 0.01 || Math.abs(camera.rotation.y) > 0.01) {
+        // Place engine exactly 5 units in front of the camera's new view
+        const dir = new THREE.Vector3(0, 0, -5);
+        dir.applyQuaternion(camera.quaternion);
+        groupRef.current.position.copy(camera.position).add(dir);
+        
+        // Face the camera perfectly
+        groupRef.current.lookAt(camera.position);
+        
+        initialized.current = true;
+      }
+    }
+  });
+
+  return <group ref={groupRef}>{children}</group>;
+}
+
 function SceneSetup({ isARMode }: { isARMode: boolean }) {
   return (
     <>
@@ -102,7 +126,13 @@ export function EngineModel({ isARMode = false }: EngineModelProps) {
 
         <Suspense fallback={null}>
           <SceneSetup isARMode={isARMode} />
-          <EngineGroup />
+          {isARMode ? (
+            <ARPositioner>
+              <EngineGroup />
+            </ARPositioner>
+          ) : (
+            <EngineGroup />
+          )}
           <Environment preset="city" />
         </Suspense>
 
