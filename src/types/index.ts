@@ -40,6 +40,7 @@ export interface ARState {
   markerFound: boolean;
   isLoading: boolean;
   cameraPermission: 'pending' | 'granted' | 'denied';
+  gyroPermission: 'pending' | 'granted' | 'denied';
   error: string | null;
 }
 

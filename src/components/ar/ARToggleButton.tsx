@@ -3,13 +3,19 @@
 import { motion } from 'framer-motion';
 import { Camera, Box } from 'lucide-react';
 import { useARStore } from '@/store/arStore';
+import { requestGyroPermission } from '@/utils/gyro';
 
 export function ARToggleButton() {
-  const { mode, setMode, cameraPermission } = useARStore();
+  const { mode, setMode, cameraPermission, setGyroPermission } = useARStore();
   const isARMode = mode === 'camera';
 
-  const handleToggle = () => {
-    setMode(isARMode ? 'demo' : 'camera');
+  const handleToggle = async () => {
+    if (!isARMode) {
+      await requestGyroPermission(setGyroPermission);
+      setMode('camera');
+    } else {
+      setMode('demo');
+    }
   };
 
   return (

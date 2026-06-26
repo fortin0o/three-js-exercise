@@ -1,7 +1,7 @@
 'use client';
 
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Environment, Grid, Stars, PerspectiveCamera } from '@react-three/drei';
+import { OrbitControls, Environment, Grid, Stars, PerspectiveCamera, DeviceOrientationControls } from '@react-three/drei';
 import { Suspense, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useModelStore } from '@/store/modelStore';
@@ -106,15 +106,19 @@ export function EngineModel({ isARMode = false }: EngineModelProps) {
           <Environment preset="city" />
         </Suspense>
 
-        <OrbitControls
-          enablePan={false}
-          minDistance={2.5}
-          maxDistance={9}
-          minPolarAngle={Math.PI * 0.1}
-          maxPolarAngle={Math.PI * 0.85}
-          enableDamping
-          dampingFactor={0.05}
-        />
+        {isARMode ? (
+          <DeviceOrientationControls />
+        ) : (
+          <OrbitControls
+            enablePan={false}
+            minDistance={2.5}
+            maxDistance={9}
+            minPolarAngle={Math.PI * 0.1}
+            maxPolarAngle={Math.PI * 0.85}
+            enableDamping
+            dampingFactor={0.05}
+          />
+        )}
       </Canvas>
     </div>
   );

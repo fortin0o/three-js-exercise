@@ -6,6 +6,7 @@ import { useUIStore, SheetId } from '@/store/uiStore';
 import { useRouter } from 'next/navigation';
 import { useModelStore } from '@/store/modelStore';
 import { useARStore } from '@/store/arStore';
+import { requestGyroPermission } from '@/utils/gyro';
 
 interface MenuItem {
   id: SheetId;
@@ -25,7 +26,7 @@ const MENU_ITEMS: MenuItem[] = [
 export function FABMenu() {
   const { fabOpen, toggleFab, openSheet } = useUIStore();
   const { selectedPartId } = useModelStore();
-  const { setMode } = useARStore();
+  const { setMode, setGyroPermission } = useARStore();
   const router = useRouter();
 
   const handleItemClick = (id: SheetId) => {
@@ -79,7 +80,8 @@ export function FABMenu() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.8 }}
               transition={{ delay: MENU_ITEMS.length * 0.05, type: 'spring', stiffness: 300, damping: 20 }}
-              onClick={() => { 
+              onClick={async () => { 
+                await requestGyroPermission(setGyroPermission);
                 setMode('camera'); 
                 toggleFab(); 
               }}

@@ -7,6 +7,7 @@ interface ARStore extends ARState {
   setMarkerFound: (found: boolean) => void;
   setLoading: (loading: boolean) => void;
   setCameraPermission: (perm: ARState['cameraPermission']) => void;
+  setGyroPermission: (perm: ARState['gyroPermission']) => void;
   setError: (error: string | null) => void;
 }
 
@@ -16,6 +17,7 @@ export const useARStore = create<ARStore>((set) => ({
   markerFound: false,
   isLoading: true,
   cameraPermission: 'pending',
+  gyroPermission: 'pending',
   error: null,
 
   setMode: (mode) => set({ mode }),
@@ -23,5 +25,6 @@ export const useARStore = create<ARStore>((set) => ({
   setMarkerFound: (markerFound) => set({ markerFound }),
   setLoading: (isLoading) => set({ isLoading }),
   setCameraPermission: (cameraPermission) => set({ cameraPermission }),
+  setGyroPermission: (gyroPermission) => set({ gyroPermission }),
   setError: (error) => set({ error }),
 }));
