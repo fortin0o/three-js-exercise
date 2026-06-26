@@ -8,17 +8,17 @@ import { motion } from 'framer-motion';
 
 export function AnimationSheet() {
   const { activeSheet, closeSheet } = useUIStore();
-  const { isAnimating, setAnimating, isExploded, setExploded } = useModelStore();
+  const { isAnimating, setAnimating, isExploded, setExploded, animationTarget } = useModelStore();
   const isOpen = activeSheet === 'animation';
 
   const animations = [
     {
       id: 'demo',
-      icon: isAnimating ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />,
-      label: isAnimating ? 'Stop Demo' : 'Start Demo',
+      icon: isAnimating && animationTarget === 'fullCycle' ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />,
+      label: isAnimating && animationTarget === 'fullCycle' ? 'Stop Demo' : 'Start Demo',
       color: 'emerald',
-      onClick: () => setAnimating(!isAnimating),
-      active: isAnimating,
+      onClick: () => setAnimating(!(isAnimating && animationTarget === 'fullCycle'), 'fullCycle'),
+      active: isAnimating && animationTarget === 'fullCycle',
     },
     {
       id: 'exploded',
@@ -33,8 +33,8 @@ export function AnimationSheet() {
       icon: <RotateCw className="w-5 h-5" />,
       label: 'Working Cycle',
       color: 'amber',
-      onClick: () => setAnimating(true, 'working_cycle'),
-      active: false,
+      onClick: () => setAnimating(true, 'fullCycle'),
+      active: isAnimating && animationTarget === 'fullCycle',
     },
   ];
 
