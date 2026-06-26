@@ -1,8 +1,9 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, MessageSquare, Mic, Info, Play, Settings } from 'lucide-react';
+import { Plus, MessageSquare, Mic, Info, Play, Settings, ScanLine } from 'lucide-react';
 import { useUIStore, SheetId } from '@/store/uiStore';
+import { useRouter } from 'next/navigation';
 import { useModelStore } from '@/store/modelStore';
 
 interface MenuItem {
@@ -23,6 +24,7 @@ const MENU_ITEMS: MenuItem[] = [
 export function FABMenu() {
   const { fabOpen, toggleFab, openSheet } = useUIStore();
   const { selectedPartId } = useModelStore();
+  const router = useRouter();
 
   const handleItemClick = (id: SheetId) => {
     openSheet(id);
@@ -69,6 +71,31 @@ export function FABMenu() {
                 </motion.button>
               );
             })}
+            {/* AR Launch Button */}
+            <motion.button
+              initial={{ opacity: 0, y: 20, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.8 }}
+              transition={{ delay: MENU_ITEMS.length * 0.05, type: 'spring', stiffness: 300, damping: 20 }}
+              onClick={() => { router.push('/ar'); }}
+              className="group flex items-center gap-3"
+            >
+              <span className="px-3 py-1.5 rounded-lg text-sm font-medium text-white/80 bg-black/40 backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                AR Live View
+              </span>
+              <div
+                className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform duration-200 hover:scale-110 active:scale-95 text-fuchsia-400"
+                style={{
+                  background: 'rgba(20,25,35,0.8)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                  border: '1px solid rgba(232,121,249,0.3)',
+                  boxShadow: '0 0 16px rgba(232,121,249,0.2)',
+                }}
+              >
+                <ScanLine className="w-5 h-5" />
+              </div>
+            </motion.button>
           </motion.div>
         )}
       </AnimatePresence>

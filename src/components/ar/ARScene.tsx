@@ -6,7 +6,8 @@ import { useARStore } from '@/store/arStore';
 import { useModelStore } from '@/store/modelStore';
 import { ENGINE_PARTS } from '@/data/engineParts';
 import { GlassCard } from '../ui/GlassCard';
-import { ZoomIn, ZoomOut, RotateCcw, Layers, Box, Info } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Layers, Info, Wifi, WifiOff } from 'lucide-react';
+import { ARToggleButton } from './ARToggleButton';
 
 // Lazy load the heavy 3D canvas
 const EngineModel = dynamic(
@@ -24,50 +25,151 @@ const EngineModel = dynamic(
   }
 );
 
+// Lazy load camera background (needs browser APIs)
+const CameraBackground = dynamic(
+  () => import('./CameraBackground').then((m) => ({ default: m.CameraBackground })),
+  { ssr: false }
+);
+
 export function ARScene() {
-  const { mode } = useARStore();
+  const { mode, isTracking, cameraPermission } = useARStore();
   const { selectedPartId, setSelectedPart, setScale, scale, isExploded, setExploded, resetModel } =
     useModelStore();
 
-  return (
-    <div className="relative w-full h-full bg-[#020408] overflow-hidden scanline-overlay">
-      {/* Background grid */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-30" />
-      <div className="absolute inset-0 bg-radial-gradient" />
+  const isARMode = mode === 'camera';
 
-      {/* 3D Canvas */}
-      <div className="absolute inset-0">
-        <EngineModel />
+  return (
+    <div
+      className={`relative w-full h-full overflow-hidden ${
+        isARMode ? 'bg-black' : 'bg-[#020408] scanline-overlay'
+      }`}
+    >
+      {/* ─── Demo Mode Background ──────────────────────────── */}
+      {!isARMode && (
+        <>
+          <div className="absolute inset-0 bg-grid-pattern opacity-30" />
+          <div className="absolute inset-0 bg-radial-gradient" />
+        </>
+      )}
+
+      {/* ─── AR Mode: Live Camera Feed ─────────────────────── */}
+      <AnimatePresence>
+        {isARMode && (
+          <motion.div
+            key="camera-bg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            className="absolute inset-0 z-0"
+          >
+            <CameraBackground />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── 3D Canvas ─────────────────────────────────────── */}
+      {/* In AR mode: transparent canvas floats above the camera feed */}
+      <div className="absolute inset-0 z-10">
+        <EngineModel isARMode={isARMode} />
       </div>
 
+      {/* ─── AR Mode: Corner Brackets (scan frame) ─────────── */}
+      {isARMode && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+          <motion.div
+            initial={{ opacity: 0, scale: 1.1 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-56 h-56"
+          >
+            {[
+              'top-0 left-0 border-t-2 border-l-2 rounded-tl-sm',
+              'top-0 right-0 border-t-2 border-r-2 rounded-tr-sm',
+              'bottom-0 left-0 border-b-2 border-l-2 rounded-bl-sm',
+              'bottom-0 right-0 border-b-2 border-r-2 rounded-br-sm',
+            ].map((cls, i) => (
+              <motion.div
+                key={i}
+                className={`absolute w-8 h-8 border-cyan-400 ${cls}`}
+                animate={{ opacity: [1, 0.5, 1] }}
+                transition={{ duration: 2, delay: i * 0.15, repeat: Infinity }}
+              />
+            ))}
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+              <motion.div
+                className="w-2 h-2 rounded-full bg-cyan-400"
+                animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+              <span className="text-[9px] text-cyan-400/60 tracking-widest uppercase mt-1">
+                AR Active
+              </span>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* ─── HUD Top Bar ───────────────────────────────────── */}
-      <div className="absolute top-0 left-0 right-0 p-3 flex items-start justify-between pointer-events-none">
+      <div className="absolute top-0 left-0 right-0 p-3 flex items-start justify-between z-30 pointer-events-none">
+        {/* Left: Mode toggle */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.5 }}
           className="pointer-events-auto"
         >
-          <GlassCard className="px-3 py-2 flex items-center gap-2">
-            <Box className="w-4 h-4 text-cyan-400" />
-            <div>
-              <div className="text-[10px] text-[#4a5568] uppercase tracking-wider">Mode</div>
-              <div className="text-xs font-semibold text-cyan-400">3D Demo View</div>
-            </div>
-          </GlassCard>
+          <ARToggleButton />
         </motion.div>
 
-        {/* Status indicators */}
+        {/* Right: Status indicators */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.6 }}
           className="flex gap-2 pointer-events-auto"
         >
+          {/* AR Live / Engine status badge */}
           <GlassCard className="px-3 py-2">
             <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] text-emerald-400 font-medium">ENGINE ONLINE</span>
+              <AnimatePresence mode="wait">
+                {isARMode ? (
+                  <motion.div
+                    key="ar-status"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex items-center gap-2"
+                  >
+                    {cameraPermission === 'granted' ? (
+                      <>
+                        <motion.div
+                          className="w-1.5 h-1.5 rounded-full bg-cyan-400"
+                          animate={{ opacity: [1, 0.3, 1] }}
+                          transition={{ duration: 1, repeat: Infinity }}
+                        />
+                        <span className="text-[10px] text-cyan-400 font-medium">AR LIVE</span>
+                        <Wifi className="w-3 h-3 text-cyan-400" />
+                      </>
+                    ) : (
+                      <>
+                        <WifiOff className="w-3 h-3 text-red-400" />
+                        <span className="text-[10px] text-red-400 font-medium">NO CAMERA</span>
+                      </>
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="demo-status"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex items-center gap-2"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] text-emerald-400 font-medium">ENGINE ONLINE</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </GlassCard>
         </motion.div>
@@ -78,7 +180,7 @@ export function ARScene() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.8 }}
-        className="absolute bottom-20 left-3 flex flex-col gap-1.5"
+        className="absolute bottom-20 left-3 flex flex-col gap-1.5 z-30"
       >
         {ENGINE_PARTS.map((part) => (
           <button
@@ -117,7 +219,7 @@ export function ARScene() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.9 }}
-        className="absolute bottom-20 right-3 flex flex-col gap-2"
+        className="absolute bottom-20 right-3 flex flex-col gap-2 z-30"
       >
         <GlassCard className="flex flex-col gap-1 p-1.5">
           <ControlBtn icon={<ZoomIn className="w-4 h-4" />} onClick={() => setScale(scale + 0.2)} title="Zoom in" />
@@ -140,21 +242,8 @@ export function ARScene() {
         />
       </motion.div>
 
-      {/* ─── Crosshair / AR Target ───────────────────────── */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="relative w-24 h-24 opacity-20">
-          <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-cyan-400 rounded-tl" />
-          <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-cyan-400 rounded-tr" />
-          <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-cyan-400 rounded-bl" />
-          <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-cyan-400 rounded-br" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-          </div>
-        </div>
-      </div>
-
       {/* ─── Tip bar ─────────────────────────────────────── */}
-      <div className="absolute bottom-3 left-0 right-0 flex justify-center px-4 pointer-events-none">
+      <div className="absolute bottom-3 left-0 right-0 flex justify-center px-4 pointer-events-none z-30">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -163,7 +252,9 @@ export function ARScene() {
           <GlassCard className="px-3 py-1.5 flex items-center gap-2">
             <Info className="w-3.5 h-3.5 text-cyan-400 flex-none" />
             <p className="text-[11px] text-[#8892a4]">
-              Tap komponen • Scroll untuk zoom • Drag untuk rotasi
+              {isARMode
+                ? 'AR aktif • Arahkan kamera ke ruangan • Drag untuk rotasi'
+                : 'Tap komponen • Scroll untuk zoom • Drag untuk rotasi'}
             </p>
           </GlassCard>
         </motion.div>

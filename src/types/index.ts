@@ -27,6 +27,8 @@ export interface ModelState {
   isXRay: boolean;
   rotationSpeed: number;
   scale: number;
+  manualCrank: number;
+  engineTime: { current: number };
 }
 
 // ─── AR State Types ───────────────────────────────────────────

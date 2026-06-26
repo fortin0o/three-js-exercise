@@ -2,6 +2,7 @@
 
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import { useModelStore } from '@/store/modelStore';
 import { PART_MAP } from '@/data/engineParts';
 import * as THREE from 'three';
@@ -49,6 +50,51 @@ function ClickGroup({ partId, children }: ClickGroupProps) {
     >
       {children}
     </group>
+  );
+}
+
+// ─── Dynamic 3D Annotation ──────────────────────────────────────────────────
+interface PartAnnotationProps {
+  partId: PartId;
+  position?: [number, number, number];
+}
+function PartAnnotation({ partId, position = [0, 0, 0] }: PartAnnotationProps) {
+  const { selectedPartId } = useModelStore();
+  const part = PART_MAP[partId];
+  
+  if (selectedPartId !== partId || !part) return null;
+
+  return (
+    <Html position={position} center distanceFactor={2} zIndexRange={[100, 0]}>
+      <div className="flex flex-col gap-1 p-3 rounded-xl bg-black/60 backdrop-blur-md border border-white/20 text-white w-48 shadow-2xl pointer-events-none">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-sm text-cyan-400 uppercase tracking-wider">{part.name}</span>
+          <div className={`w-2 h-2 rounded-full ${part.status === 'optimal' ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
+        </div>
+        <div className="text-xs text-zinc-300 mb-1 leading-tight">{part.function}</div>
+        
+        <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-white/10 text-[10px] text-zinc-400">
+          {part.temperature && (
+            <div className="flex flex-col">
+              <span className="uppercase tracking-wide opacity-70">Temp</span>
+              <span className="font-mono text-zinc-200">{part.temperature}</span>
+            </div>
+          )}
+          {part.material && (
+            <div className="flex flex-col">
+              <span className="uppercase tracking-wide opacity-70">Material</span>
+              <span className="font-mono text-zinc-200">{part.material}</span>
+            </div>
+          )}
+          {part.rpm && (
+            <div className="flex flex-col col-span-2">
+              <span className="uppercase tracking-wide opacity-70">Speed</span>
+              <span className="font-mono text-zinc-200">{part.rpm}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </Html>
   );
 }
 
@@ -129,7 +175,8 @@ function SMesh({ partId, geometry, color, position, rotation, roughness = 0.45, 
 
   useFrame((state) => {
     if (!meshRef.current) return;
-    const t = state.clock.getElapsedTime();
+    const { isAnimating, engineTime } = useModelStore.getState();
+    const t = isAnimating ? state.clock.getElapsedTime() : engineTime.current;
 
     if (isAnimating && animationTarget) {
       if (animationTarget === 'crankshaftSpin' && partId === 'crankshaft') {
@@ -270,7 +317,8 @@ function Crankshaft() {
 
   useFrame((state) => {
     if (!crankRef.current) return;
-    const t = state.clock.getElapsedTime();
+    const { isAnimating, animationTarget, engineTime } = useModelStore.getState();
+    const t = isAnimating ? state.clock.getElapsedTime() : engineTime.current;
     const doAnim = isAnimating && (animationTarget === 'crankshaftSpin' || animationTarget === 'fullCycle');
     crankRef.current.rotation.x = doAnim ? t * 4 : t * 0.3;
   });
@@ -338,7 +386,8 @@ function PistonAssembly({ x, phase }: { x: number; phase: number }) {
 
   useFrame((state) => {
     if (!pistonRef.current) return;
-    const t = state.clock.getElapsedTime();
+    const { isAnimating, animationTarget, engineTime } = useModelStore.getState();
+    const t = isAnimating ? state.clock.getElapsedTime() : engineTime.current;
     const doAnim = isAnimating && (animationTarget === 'pistonMove' || animationTarget === 'fullCycle');
     const amplitude = doAnim ? 0.28 : 0.012;
     const speed     = doAnim ? 6    : 0.8;
@@ -411,7 +460,8 @@ function Camshaft() {
 
   useFrame((state) => {
     if (!camRef.current) return;
-    const t = state.clock.getElapsedTime();
+    const { isAnimating, animationTarget, engineTime } = useModelStore.getState();
+    const t = isAnimating ? state.clock.getElapsedTime() : engineTime.current;
     const doAnim = isAnimating && (animationTarget === 'camshaftRotate' || animationTarget === 'fullCycle');
     camRef.current.rotation.x = doAnim ? t * 2 : t * 0.15;
   });
@@ -461,7 +511,8 @@ function ValveSet() {
   const { isAnimating, animationTarget } = useModelStore();
 
   useFrame((state) => {
-    const t = state.clock.getElapsedTime();
+    const { isAnimating, animationTarget, engineTime } = useModelStore.getState();
+    const t = isAnimating ? state.clock.getElapsedTime() : engineTime.current;
     const doAnim = isAnimating && (animationTarget === 'valveOpen' || animationTarget === 'fullCycle');
     valveRefs.current.forEach((ref, i) => {
       if (!ref) return;
@@ -518,7 +569,8 @@ function SparkPlugs() {
   const isSelected = selectedPartId === 'sparkplug';
 
   useFrame((state) => {
-    const t = state.clock.getElapsedTime();
+    const { isAnimating, animationTarget, engineTime } = useModelStore.getState();
+    const t = isAnimating ? state.clock.getElapsedTime() : engineTime.current;
     const doAnim = isAnimating && animationTarget === 'sparkIgnite';
     plugRefs.current.forEach((mesh, i) => {
       if (!mesh) return;
@@ -660,6 +712,22 @@ function ExplodeGroup({ children, offset }: { children: React.ReactNode; offset:
   return <group ref={groupRef}>{children}</group>;
 }
 
+// ─── Master Time Controller ──────────────────────────────────────────────────
+function EngineTimeController() {
+  useFrame((state, delta) => {
+    const store = useModelStore.getState();
+    if (store.isAnimating) {
+      // Just to keep the engineTime roughly in sync with clock if they switch back and forth
+      // Actually, when animating we use elapsed time, when paused we use manualCrank.
+      // We don't strictly need to do anything here if components check isAnimating.
+    } else {
+      // Map manualCrank (0 to 1) to a full 720 degree cycle (4*PI)
+      store.engineTime.current = store.manualCrank * Math.PI * 4;
+    }
+  });
+  return null;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  ROOT EXPORT
 // ═══════════════════════════════════════════════════════════════════════════
@@ -673,8 +741,11 @@ export function EngineModelParts() {
 
   return (
     <group>
+      <EngineTimeController />
+
       <ExplodeGroup offset={[0, 0, 0]}>
         <EngineBlock />
+        <PartAnnotation partId="cylinder" position={[1.0, 0, 0]} />
       </ExplodeGroup>
 
       <ExplodeGroup offset={[0, 1.2, 0]}>
@@ -691,24 +762,29 @@ export function EngineModelParts() {
 
       <ExplodeGroup offset={[0, -1.0, 0]}>
         <Crankshaft />
+        <PartAnnotation partId="crankshaft" position={[1.0, -0.45, 0]} />
       </ExplodeGroup>
 
       {pistonData.map((p) => (
         <ExplodeGroup key={p.x} offset={[0, -1.0, 0]}>
           <PistonAssembly x={p.x} phase={p.phase} />
+          {p.x === -0.675 && <PartAnnotation partId="piston" position={[p.x - 0.5, 0.2, 0]} />}
         </ExplodeGroup>
       ))}
 
       <ExplodeGroup offset={[0, 2.2, 0]}>
         <Camshaft />
+        <PartAnnotation partId="camshaft" position={[1.0, 1.12, 0]} />
       </ExplodeGroup>
 
       <ExplodeGroup offset={[0, 1.5, 0]}>
         <ValveSet />
+        <PartAnnotation partId="valve" position={[1.0, 0.82, 0]} />
       </ExplodeGroup>
 
       <ExplodeGroup offset={[0, 2.0, 0]}>
         <SparkPlugs />
+        <PartAnnotation partId="sparkplug" position={[1.0, 0.98, 0]} />
       </ExplodeGroup>
 
       <ExplodeGroup offset={[0, 1.2, -1.2]}>

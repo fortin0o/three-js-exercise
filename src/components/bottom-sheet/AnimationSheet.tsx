@@ -104,6 +104,31 @@ export function AnimationSheet() {
             <span>Exploded</span>
           </div>
         </motion.div>
+        
+        {/* Manual Crank Slider */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mt-4 p-5 rounded-2xl bg-white/5 border border-white/10"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-sm text-zinc-400 uppercase tracking-wider font-medium">Manual Crank</div>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.001"
+            value={useModelStore((state) => state.manualCrank)}
+            onChange={(e) => useModelStore.getState().setManualCrank(parseFloat(e.target.value))}
+            className="w-full h-2 bg-black/50 rounded-lg appearance-none cursor-pointer accent-amber-500"
+          />
+          <div className="flex justify-between text-xs text-zinc-500 mt-2">
+            <span>0° (TDC)</span>
+            <span>720° (Full Cycle)</span>
+          </div>
+        </motion.div>
       </div>
     </BottomSheet>
   );

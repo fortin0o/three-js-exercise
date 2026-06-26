@@ -8,6 +8,7 @@ interface ModelStore extends ModelState {
   setExplosionProgress: (progress: number) => void;
   setXRay: (xray: boolean) => void;
   setScale: (scale: number) => void;
+  setManualCrank: (crank: number) => void;
   resetModel: () => void;
 }
 
@@ -20,6 +21,8 @@ const initialState: ModelState = {
   isXRay: false,
   rotationSpeed: 0.3,
   scale: 1,
+  manualCrank: 0,
+  engineTime: { current: 0 },
 };
 
 export const useModelStore = create<ModelStore>((set) => ({
@@ -42,6 +45,9 @@ export const useModelStore = create<ModelStore>((set) => ({
 
   setScale: (scale) =>
     set({ scale: Math.max(0.3, Math.min(3, scale)) }),
+    
+  setManualCrank: (crank) =>
+    set({ manualCrank: crank, isAnimating: false }), // automatically pause animation when manually cranking
 
   resetModel: () =>
     set(initialState),
