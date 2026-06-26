@@ -23,6 +23,7 @@ export interface ModelState {
   isAnimating: boolean;
   animationTarget: string | null;
   isExploded: boolean;
+  explosionProgress: number;
   isXRay: boolean;
   rotationSpeed: number;
   scale: number;

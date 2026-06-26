@@ -7,6 +7,11 @@ import { PART_MAP } from '@/data/engineParts';
 import * as THREE from 'three';
 import type { PartId } from '@/types';
 
+// ─── Utilities ──────────────────────────────────────────────────────────────
+const getStage = (progress: number, start: number, end: number) => {
+  return THREE.MathUtils.clamp((progress - start) / (end - start), 0, 1);
+};
+
 // ─── Colour palette ────────────────────────────────────────────────────────
 const MAT = {
   block:      '#3a3f4b',
@@ -634,6 +639,27 @@ function ExhaustManifold() {
   );
 }
 
+// ─── Explode Wrapper ───────────────────────────────────────────────────────
+function ExplodeGroup({ children, offset }: { children: React.ReactNode; offset: [number, number, number] }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const currentProgress = useRef(useModelStore.getState().explosionProgress);
+  
+  useFrame((state, delta) => {
+    if (!groupRef.current) return;
+    const targetProgress = useModelStore.getState().explosionProgress;
+    // Smoothly interpolate to the target progress
+    currentProgress.current = THREE.MathUtils.lerp(currentProgress.current, targetProgress, delta * 10);
+    
+    groupRef.current.position.set(
+      offset[0] * currentProgress.current,
+      offset[1] * currentProgress.current,
+      offset[2] * currentProgress.current
+    );
+  });
+
+  return <group ref={groupRef}>{children}</group>;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  ROOT EXPORT
 // ═══════════════════════════════════════════════════════════════════════════
@@ -647,19 +673,51 @@ export function EngineModelParts() {
 
   return (
     <group>
-      <EngineBlock />
-      <CylinderHead />
-      <OilPan />
-      <TimingCover />
-      <Crankshaft />
+      <ExplodeGroup offset={[0, 0, 0]}>
+        <EngineBlock />
+      </ExplodeGroup>
+
+      <ExplodeGroup offset={[0, 1.2, 0]}>
+        <CylinderHead />
+      </ExplodeGroup>
+
+      <ExplodeGroup offset={[0, -1.5, 0]}>
+        <OilPan />
+      </ExplodeGroup>
+
+      <ExplodeGroup offset={[-1.5, 0, 0]}>
+        <TimingCover />
+      </ExplodeGroup>
+
+      <ExplodeGroup offset={[0, -1.0, 0]}>
+        <Crankshaft />
+      </ExplodeGroup>
+
       {pistonData.map((p) => (
-        <PistonAssembly key={p.x} x={p.x} phase={p.phase} />
+        <ExplodeGroup key={p.x} offset={[0, -1.0, 0]}>
+          <PistonAssembly x={p.x} phase={p.phase} />
+        </ExplodeGroup>
       ))}
-      <Camshaft />
-      <ValveSet />
-      <SparkPlugs />
-      <IntakeManifold />
-      <ExhaustManifold />
+
+      <ExplodeGroup offset={[0, 2.2, 0]}>
+        <Camshaft />
+      </ExplodeGroup>
+
+      <ExplodeGroup offset={[0, 1.5, 0]}>
+        <ValveSet />
+      </ExplodeGroup>
+
+      <ExplodeGroup offset={[0, 2.0, 0]}>
+        <SparkPlugs />
+      </ExplodeGroup>
+
+      <ExplodeGroup offset={[0, 1.2, -1.2]}>
+        <IntakeManifold />
+      </ExplodeGroup>
+
+      <ExplodeGroup offset={[0, 1.2, 1.2]}>
+        <ExhaustManifold />
+      </ExplodeGroup>
     </group>
   );
 }

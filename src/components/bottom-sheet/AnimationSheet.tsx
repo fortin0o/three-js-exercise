@@ -3,12 +3,12 @@
 import { BottomSheet } from './BottomSheet';
 import { useUIStore } from '@/store/uiStore';
 import { useModelStore } from '@/store/modelStore';
-import { Play, Pause, FastForward, Maximize2, RotateCw, Eye } from 'lucide-react';
+import { Play, Pause, FastForward, Maximize2, RotateCw, Eye, Layers } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export function AnimationSheet() {
   const { activeSheet, closeSheet } = useUIStore();
-  const { isAnimating, setAnimating, isExploded, setExploded, animationTarget, isXRay, setXRay } = useModelStore();
+  const { isAnimating, setAnimating, explosionProgress, setExplosionProgress, isExploded, setExploded, animationTarget, isXRay, setXRay } = useModelStore();
   const isOpen = activeSheet === 'animation';
 
   const animations = [
@@ -23,10 +23,10 @@ export function AnimationSheet() {
     {
       id: 'exploded',
       icon: <Maximize2 className="w-5 h-5" />,
-      label: isExploded ? 'Assemble View' : 'Exploded View',
+      label: explosionProgress > 0 ? 'Assemble View' : 'Explode Instantly',
       color: 'blue',
-      onClick: () => setExploded(!isExploded),
-      active: isExploded,
+      onClick: () => setExploded(explosionProgress === 0),
+      active: explosionProgress > 0,
     },
     {
       id: 'xray',
@@ -79,7 +79,7 @@ export function AnimationSheet() {
           </motion.button>
         ))}
 
-        {/* Speed Slider Example */}
+        {/* Assembly Slider */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -87,21 +87,21 @@ export function AnimationSheet() {
           className="mt-4 p-5 rounded-2xl bg-white/5 border border-white/10"
         >
           <div className="flex items-center justify-between mb-4">
-            <div className="text-sm text-zinc-400 uppercase tracking-wider font-medium">Animation Speed</div>
-            <FastForward className="w-4 h-4 text-zinc-500" />
+            <div className="text-sm text-zinc-400 uppercase tracking-wider font-medium">Assembly Slider</div>
+            <Layers className="w-4 h-4 text-zinc-500" />
           </div>
           <input
             type="range"
-            min="0.5"
-            max="2"
-            step="0.1"
-            defaultValue="1"
-            className="w-full h-2 bg-black/50 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+            min="0"
+            max="1"
+            step="0.01"
+            value={explosionProgress}
+            onChange={(e) => setExplosionProgress(parseFloat(e.target.value))}
+            className="w-full h-2 bg-black/50 rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
           <div className="flex justify-between text-xs text-zinc-500 mt-2">
-            <span>0.5x</span>
-            <span>1x</span>
-            <span>2x</span>
+            <span>Assembled</span>
+            <span>Exploded</span>
           </div>
         </motion.div>
       </div>
